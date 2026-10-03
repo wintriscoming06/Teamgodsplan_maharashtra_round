@@ -81,7 +81,7 @@ Some things we would like to add later:
 
 ## Running the project
 
-Clone the repository and install the dependencies:
+Clone the repo and install the dependencies:
 
 ```bash
 npm install
