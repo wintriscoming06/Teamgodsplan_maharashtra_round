@@ -1,0 +1,412 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DB_FILE = path.join(__dirname, 'db.json');
+
+export interface UserRecord {
+  id: string;
+  name: string;
+  handle: string;
+  email: string;
+  createdAt: string;
+}
+
+export interface ProjectRecord {
+  id: string;
+  title: string;
+  format: string;
+  duration: string;
+  status: 'Ready' | 'Processing' | 'Published';
+  statusDetail: string;
+  clipsCount: number;
+  repurposedSummary: string;
+  thumbnail: string;
+  timeAgo: string;
+}
+
+export interface ClipRecord {
+  id: string;
+  rank: number;
+  badge: string;
+  title: string;
+  timeRange: string;
+  durationSeconds: number;
+  score: number;
+  scoreTier: 'EXTREME' | 'HIGH' | 'GOOD';
+  tags: string[];
+  hook: string;
+  wpm: number;
+  engineInsight: string;
+  recommendedPlatform: string;
+  aspectRatio: string;
+  transcriptSnippet: string;
+}
+
+export interface RepurposedRecord {
+  id: string;
+  platform: 'reel' | 'short' | 'linkedin' | 'x' | 'youtube_desc';
+  platformName: string;
+  title: string;
+  caption: string;
+  hashtags: string[];
+  specs: string;
+  aspectRatio: string;
+  characterLimit?: number;
+}
+
+export interface AnalysisJob {
+  jobId: string;
+  projectId: string;
+  status: 'running' | 'completed' | 'failed';
+  currentStage: number;
+  totalStages: number;
+  progressPercent: number;
+  elapsedSeconds: number;
+  stages: {
+    id: number;
+    name: string;
+    status: 'done' | 'in-progress' | 'queued';
+    description: string;
+  }[];
+}
+
+interface DatabaseSchema {
+  users: UserRecord[];
+  projects: ProjectRecord[];
+  clips: ClipRecord[];
+  repurposed: RepurposedRecord[];
+  jobs: Record<string, AnalysisJob>;
+}
+
+const DEFAULT_DATA: DatabaseSchema = {
+  users: [
+    {
+      id: 'user-default',
+      name: 'Elena Vance',
+      handle: 'elenacreates',
+      email: 'elena@creatorai.internal',
+      createdAt: new Date().toISOString()
+    }
+  ],
+  projects: [
+    {
+      id: 'proj-1',
+      title: 'The Future of Software Development',
+      format: 'Uploaded 2 hours ago • 4K ProRes',
+      duration: '20 min 14 sec',
+      status: 'Ready',
+      statusDetail: 'Ready (7 Clips)',
+      clipsCount: 7,
+      repurposedSummary: '12 Multi-Posts (7 Shorts, 3 X Threads, 2 Blogs)',
+      thumbnail: '/assets/media_1791040457019.png',
+      timeAgo: '2h ago'
+    },
+    {
+      id: 'proj-2',
+      title: 'How To Build AI Apps in 1 Hour',
+      format: 'Transcribing • Whisper Engine v3',
+      duration: '34 min 10 sec',
+      status: 'Processing',
+      statusDetail: 'Processing 84%',
+      clipsCount: 5,
+      repurposedSummary: '5 Clips Identified: Extracting hooks & B-rolls',
+      thumbnail: '/assets/media_1791040473592.png',
+      timeAgo: '4h ago'
+    },
+    {
+      id: 'proj-3',
+      title: 'Podcast Ep #42: Solo Founder P...',
+      format: 'Fully Distributed • Spotify & Apple',
+      duration: '52 min 19 sec',
+      status: 'Published',
+      statusDetail: 'Published',
+      clipsCount: 12,
+      repurposedSummary: '22 Posts Live: 184.2k aggregate views',
+      thumbnail: '/assets/media_1791040204833.png',
+      timeAgo: 'Yesterday'
+    }
+  ],
+  clips: [
+    {
+      id: 'clip-1',
+      rank: 1,
+      badge: '#1 HIGHEST RETENTION',
+      title: "AI won't replace programmers.",
+      timeRange: "04:32 – 05:18",
+      durationSeconds: 46,
+      score: 94,
+      scoreTier: 'EXTREME',
+      tags: ["Career & Tech Future", "Contrarian Take", "High Shareability"],
+      hook: "AI won't replace programmers — but programmers using AI will replace those who don't.",
+      wpm: 154,
+      engineInsight: "Strong cold opening, standalone context and high information density. Immediate emotional tension drives initial 3-second hook rate to >82%.",
+      recommendedPlatform: "Recommended for Instagram Reels & Shorts",
+      aspectRatio: "9:16",
+      transcriptSnippet: "AI won't replace programmers — but programmers using AI will replace those who don't. It is about architectural bandwidth, not syntactic speed."
+    },
+    {
+      id: 'clip-2',
+      rank: 2,
+      badge: '#2 HIGH POTENTIAL',
+      title: "Why Senior Engineers Write Less Code in 2025",
+      timeRange: "08:15 – 09:00",
+      durationSeconds: 45,
+      score: 91,
+      scoreTier: 'HIGH',
+      tags: ["Engineering Productivity", "Dev Insights"],
+      hook: "The best coders aren't typing 100 lines a minute anymore. They are orchestrating models.",
+      wpm: 148,
+      engineInsight: "High relatability hook with clear contrarian insight. Targets developer community debate; proven comment velocity booster.",
+      recommendedPlatform: "Optimal for LinkedIn Developer Feed",
+      aspectRatio: "9:16",
+      transcriptSnippet: "When you look at LLMs writing code, it's not about typing speed; it's about architecture. Junior engineers think prompt engineering is typing magic, but it's really distributed systems modeling."
+    },
+    {
+      id: 'clip-3',
+      rank: 3,
+      badge: '#3 BOOKMARK MAGNET',
+      title: "The Death of Boilerplate Syntax",
+      timeRange: "14:10 – 15:02",
+      durationSeconds: 52,
+      score: 88,
+      scoreTier: 'GOOD',
+      tags: ["Developer Mindset", "Architecture"],
+      hook: "Syntax errors are obsolete. System logic design is the only game left.",
+      wpm: 162,
+      engineInsight: "Concise punchline format with high bookmark potential on LinkedIn and TikTok for educational saves.",
+      recommendedPlatform: "High Save Rate on TikTok & X",
+      aspectRatio: "9:16",
+      transcriptSnippet: "Syntax errors are obsolete. System logic design is the only game left. If you spend your time memorizing regex instead of understanding data flow, you're training for yesterday's battle."
+    },
+    {
+      id: 'clip-4',
+      rank: 4,
+      badge: '#4 TREND RIDER',
+      title: "The 10x Engineer Transformation",
+      timeRange: "17:22 – 18:04",
+      durationSeconds: 42,
+      score: 92,
+      scoreTier: 'HIGH',
+      tags: ["Future of Work", "Productivity Hacks"],
+      hook: "10x engineers aren't 10x faster at writing loops — they build autonomous feedback loops.",
+      wpm: 156,
+      engineInsight: "Explosive opening with strong authority framing. Great retention through the 30-second mark.",
+      recommendedPlatform: "Paced for TikTok High Retention",
+      aspectRatio: "9:16",
+      transcriptSnippet: "10x engineers aren't 10x faster at writing loops — they build autonomous feedback loops that test, iterate, and refine while they sleep."
+    },
+    {
+      id: 'clip-5',
+      rank: 5,
+      badge: '#5 CONTRARIAN TAKE',
+      title: "Why Junior Devs Are Learning the Wrong Skills",
+      timeRange: "19:05 – 19:48",
+      durationSeconds: 43,
+      score: 87,
+      scoreTier: 'GOOD',
+      tags: ["Career Advice", "Education"],
+      hook: "If your bootcamp is still teaching you React state syntax instead of agent orchestration, ask for a refund.",
+      wpm: 150,
+      engineInsight: "High controversy trigger generating 4.2x above average comment section engagement.",
+      recommendedPlatform: "Debate-Driven for LinkedIn & Reels",
+      aspectRatio: "9:16",
+      transcriptSnippet: "If your bootcamp is still teaching you React state syntax instead of agent orchestration, ask for a refund. The abstraction layer just moved 3 levels higher."
+    }
+  ],
+  repurposed: [
+    {
+      id: 'rep-reel',
+      platform: 'reel',
+      platformName: 'Instagram Reel',
+      title: 'The AI Replacement Myth 🤯 (Why devs are safer than you think)',
+      caption: `Are developers actually getting replaced by AI in 2026? Here's the brutal truth from 10+ years building software.\n\nAI won't replace programmers — but programmers using AI will replace those who don't.\n\nKey takeaways:\n⚡ Syntax is commoditized; architectural intuition is king.\n⚡ Prompting is just distributed systems modeling in plain English.\n⚡ The real 10x engineers are building autonomous feedback loops.\n\nSave this reel for your next technical interview prep! 💾`,
+      hashtags: ['#AI', '#SoftwareEngineering', '#TechCareers', '#CodingTips', '#DevCommunity', '#FullStack', '#FutureOfWork'],
+      specs: '9:16 Vertical Video • 46s • High Engagement Hook',
+      aspectRatio: '9:16'
+    },
+    {
+      id: 'rep-short',
+      platform: 'short',
+      platformName: 'YouTube Short',
+      title: 'AI won\'t replace programmers. (Here\'s who will) #Shorts',
+      caption: `"AI won't replace programmers — but programmers using AI will replace those who don't."\n\nFull deep-dive keynote available on the main channel: "The Future of Software Development" (20:14). Subscribe for weekly engineering architecture breakdowns! 🔔`,
+      hashtags: ['#Shorts', '#AI', '#Coding', '#Developer', '#TechNews', '#Programming'],
+      specs: '9:16 Vertical • Loop Optimized • Audio Boosted',
+      aspectRatio: '9:16'
+    },
+    {
+      id: 'rep-linkedin',
+      platform: 'linkedin',
+      platformName: 'LinkedIn Post',
+      title: 'Why AI will not replace senior software engineers',
+      caption: `The conversation around AI replacing developers fundamentally misunderstands what engineering actually is.\n\nWriting code was never the bottleneck.\n\nThe real job has always been:\n1. Translating ambiguous business problems into verifiable state machines\n2. Designing resilient distributed data boundaries\n3. Ensuring fault-tolerant rollback capabilities\n\nAI won't replace programmers — but programmers using AI will quickly replace those who don't.\n\nWhat skills are you actively upgrading this quarter? Let's discuss in the comments below. 👇`,
+      hashtags: ['#SoftwareEngineering', '#ArtificialIntelligence', '#Leadership', '#TechInnovation', '#CareerGrowth'],
+      specs: '1:1 Square Card / PDF Carousel Support • Professional Tone',
+      aspectRatio: '1:1'
+    },
+    {
+      id: 'rep-x',
+      platform: 'x',
+      platformName: 'X Post (Twitter)',
+      title: 'Thread starter: The AI Developer Paradigm',
+      caption: `AI won't replace programmers.\n\nBut programmers using AI will replace those who don't.\n\nSyntax errors are obsolete. System logic design is the only game left in town.\n\n5 things senior engineers do differently today (and how to survive): 🧵👇`,
+      hashtags: ['#buildinpublic', '#devs', '#AIagents'],
+      specs: '242/280 Characters • Optimized for Quote RTs',
+      characterLimit: 280,
+      aspectRatio: '16:9'
+    },
+    {
+      id: 'rep-yt-desc',
+      platform: 'youtube_desc',
+      platformName: 'YouTube Description',
+      title: 'The Future of Software Development (Keynote 2026) — Elena Vance',
+      caption: `In this keynote, Elena Vance breaks down how autonomous AI coding agents, ambient development environments, and LLM-assisted workflows are redefining what it means to be a software engineer in 2026.\n\n⏱️ TIMESTAMPS:\n00:00 - Introduction & The Current State of AI\n04:32 - The AI Replacement Myth (Programmer vs Tool)\n08:15 - Why Senior Engineers Write Less Code\n14:10 - The Death of Boilerplate Syntax\n17:22 - The Autonomous Feedback Loop (10x Engineer)\n19:05 - The Critical Skills Bootcamps Aren't Teaching\n\n🔗 RESOURCES MENTIONED:\n- CreatorAI Suite: https://creatorai.internal\n- Full Transcript & Slide Deck: https://elenacreates.dev/keynote-2026\n\n#SoftwareDevelopment #ArtificialIntelligence #ElenaVance #TechKeynote`,
+      hashtags: ['#SoftwareDevelopment', '#ArtificialIntelligence', '#ElenaVance', '#TechKeynote'],
+      specs: 'Longform SEO Optimized • 1,240 Characters • Chapters Included',
+      aspectRatio: '16:9'
+    }
+  ],
+  jobs: {}
+};
+
+class Database {
+  private data: DatabaseSchema;
+
+  constructor() {
+    this.data = this.load();
+  }
+
+  private load(): DatabaseSchema {
+    try {
+      if (fs.existsSync(DB_FILE)) {
+        const raw = fs.readFileSync(DB_FILE, 'utf-8');
+        return JSON.parse(raw);
+      }
+    } catch (e) {
+      console.error('[DB] Failed to read db.json, using defaults:', e);
+    }
+    this.save(DEFAULT_DATA);
+    return DEFAULT_DATA;
+  }
+
+  private save(data: DatabaseSchema): void {
+    try {
+      const dir = path.dirname(DB_FILE);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    } catch (e) {
+      console.error('[DB] Failed to save db.json:', e);
+    }
+  }
+
+  // Users
+  getUserByEmail(email: string): UserRecord | undefined {
+    return this.data.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  }
+
+  createUser(name: string, handle: string, email: string): UserRecord {
+    const existing = this.getUserByEmail(email);
+    if (existing) {
+      existing.name = name;
+      existing.handle = handle;
+      this.save(this.data);
+      return existing;
+    }
+
+    const newUser: UserRecord = {
+      id: 'user-' + Date.now(),
+      name,
+      handle,
+      email,
+      createdAt: new Date().toISOString()
+    };
+    this.data.users.push(newUser);
+    this.save(this.data);
+    return newUser;
+  }
+
+  // Projects
+  getProjects(): ProjectRecord[] {
+    return this.data.projects;
+  }
+
+  createProject(title: string, duration: string = '20 min 14 sec'): ProjectRecord {
+    const newProject: ProjectRecord = {
+      id: 'proj-' + Date.now(),
+      title,
+      format: 'Uploaded just now • 4K ProRes',
+      duration,
+      status: 'Ready',
+      statusDetail: 'Ready (5 Clips)',
+      clipsCount: 5,
+      repurposedSummary: '5 Micro-Posts generated',
+      thumbnail: '/assets/media_1791040457019.png',
+      timeAgo: 'Just now'
+    };
+    this.data.projects.unshift(newProject);
+    this.save(this.data);
+    return newProject;
+  }
+
+  // Clips
+  getClips(): ClipRecord[] {
+    return this.data.clips;
+  }
+
+  updateClip(id: string, updates: Partial<ClipRecord>): ClipRecord | null {
+    const clip = this.data.clips.find(c => c.id === id);
+    if (!clip) return null;
+    Object.assign(clip, updates);
+    this.save(this.data);
+    return clip;
+  }
+
+  // Repurposed
+  getRepurposed(): RepurposedRecord[] {
+    return this.data.repurposed;
+  }
+
+  updateRepurposed(id: string, updates: Partial<RepurposedRecord>): RepurposedRecord | null {
+    const piece = this.data.repurposed.find(p => p.id === id);
+    if (!piece) return null;
+    Object.assign(piece, updates);
+    this.save(this.data);
+    return piece;
+  }
+
+  // Jobs
+  createJob(projectId: string): AnalysisJob {
+    const jobId = 'job-' + Date.now();
+    const job: AnalysisJob = {
+      jobId,
+      projectId,
+      status: 'running',
+      currentStage: 1,
+      totalStages: 6,
+      progressPercent: 15,
+      elapsedSeconds: 0,
+      stages: [
+        { id: 1, name: 'Uploading', status: 'done', description: 'Transferred 1.4 GB proxy via edge ingest' },
+        { id: 2, name: 'Extracting Audio', status: 'done', description: '320kbps pristine audio isolated' },
+        { id: 3, name: 'Transcribing', status: 'done', description: 'Whisper v3 Large • 4,120 words indexed' },
+        { id: 4, name: 'Understanding Content', status: 'done', description: '8 core themes & semantic topics mapped' },
+        { id: 5, name: 'Finding Highlights', status: 'in-progress', description: 'Evaluating 19 candidate hook timestamps' },
+        { id: 6, name: 'Generating Clips', status: 'queued', description: 'Rendering 5 vertical 9:16 cuts' }
+      ]
+    };
+    this.data.jobs[jobId] = job;
+    this.save(this.data);
+    return job;
+  }
+
+  getJob(jobId: string): AnalysisJob | undefined {
+    return this.data.jobs[jobId];
+  }
+}
+
+export const db = new Database();
